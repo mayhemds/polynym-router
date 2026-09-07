@@ -1,0 +1,27 @@
+[
+  {
+    "taskType": "coding",
+    "role": "implementer",
+    "keywords": ["implement", "build", "add", "create", "fix", "refactor", "write", "code", "update"]
+  },
+  {
+    "taskType": "architecture",
+    "role": "architect",
+    "keywords": ["design", "architecture", "why", "tradeoff", "trade-off", "structure", "plan", "should we"]
+  },
+  {
+    "taskType": "review",
+    "role": "reviewer",
+    "keywords": ["review", "audit", "check", "critique", "look over"]
+  },
+  {
+    "taskType": "research",
+    "role": "researcher",
+    "keywords": ["research", "latest", "current", "compare", "investigate", "which is better"]
+  },
+  {
+    "taskType": "low_cost",
+    "role": "cheap_worker",
+    "keywords": ["summarise", "summarize", "extract", "classify", "label", "tag"]
+  }
+]

@@ -1,0 +1,7 @@
+{
+  "implementer": "kimi_k2",
+  "architect": "claude_opus",
+  "reviewer": "claude_sonnet",
+  "researcher": "gpt",
+  "cheap_worker": "local_small"
+}

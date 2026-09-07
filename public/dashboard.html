@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Polynym Router — Usage</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-band: #131a24;
+    --border: #21262d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --accent: #4f8ef7;
+    --good: #3fb950;
+    --warn: #d29922;
+    --bad: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.5;
+  }
+  .container {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+  header h1 {
+    font-size: 22px;
+    margin: 0 0 4px;
+    font-weight: 600;
+  }
+  header .subtitle {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin: 0 0 32px;
+  }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+  .insight {
+    border-left: 3px solid var(--accent);
+    background: var(--bg-band);
+    padding: 18px 20px;
+    border-radius: 4px;
+    font-size: 15px;
+    margin-bottom: 36px;
+  }
+  .insight strong { color: var(--text); }
+
+  .kpi-row {
+    display: flex;
+    margin-bottom: 40px;
+  }
+  .kpi {
+    flex: 1;
+    padding: 0 24px;
+  }
+  .kpi:first-child { padding-left: 0; }
+  .kpi:not(:last-child) {
+    border-right: 1px solid var(--border);
+  }
+  .kpi .value {
+    font-size: 28px;
+    font-weight: 600;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .kpi .label {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-top: 2px;
+  }
+  .kpi .context {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-top: 8px;
+  }
+
+  section { margin-bottom: 40px; }
+  section h2 {
+    font-size: 16px;
+    margin: 0 0 4px;
+    font-weight: 600;
+  }
+  section .description {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin: 0 0 16px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    background: var(--bg-band);
+  }
+  th {
+    text-align: left;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-dim);
+    font-weight: 500;
+    padding: 10px 14px;
+    border-bottom: 2px solid var(--accent);
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .note { color: var(--text-dim); font-size: 12px; }
+  .status-active { color: var(--good); }
+  .status-pending { color: var(--text-dim); }
+  .status-review { color: var(--warn); }
+
+  footer {
+    color: var(--text-dim);
+    font-size: 12px;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+    display: flex;
+    justify-content: space-between;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  .empty { color: var(--text-dim); font-size: 14px; }
+  button.refresh {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  button.refresh:hover { border-color: var(--accent); color: var(--text); }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Polynym Router</h1>
+    <p class="subtitle" id="subtitle">Loading local telemetry&hellip;</p>
+  </header>
+
+  <div id="content"></div>
+
+  <footer>
+    <span id="footer-note">Reading data/requests.jsonl on this machine only, nothing leaves localhost.</span>
+    <span>
+      <a href="/v1/stats" target="_blank">Raw JSON</a>
+      &nbsp;&middot;&nbsp;
+      <button class="refresh" onclick="load()">Refresh</button>
+    </span>
+  </footer>
+</div>
+
+<script>
+async function load() {
+  const subtitle = document.getElementById('subtitle');
+  const content = document.getElementById('content');
+  subtitle.textContent = 'Loading local telemetry\u2026';
+  try {
+    const res = await fetch('/v1/stats');
+    if (!res.ok) throw new Error('Server responded with ' + res.status);
+    const stats = await res.json();
+    render(stats);
+  } catch (err) {
+    subtitle.textContent = 'Could not reach the router.';
+    content.innerHTML = '<p class="empty">Failed to load /v1/stats: ' + escapeHtml(err.message) +
+      '. Confirm the router is running on this same origin.</p>';
+  }
+}
+
+function render(stats) {
+  const subtitle = document.getElementById('subtitle');
+  const content = document.getElementById('content');
+  const now = new Date().toLocaleTimeString();
+  subtitle.textContent = 'Local telemetry from data/requests.jsonl, as of ' + now + '.';
+
+  if (stats.totalRequests === 0) {
+    content.innerHTML =
+      '<div class="insight">No requests logged yet. Once you route tasks through <span class="mono">/v1/ai</span>, ' +
+      '<span class="mono">/v1/tasks</span>, or the MCP server, this page fills in with real usage, which models get picked, ' +
+      'how often they succeed, and what it costs.</div>';
+    return;
+  }
+
+  const models = Object.entries(stats.byModel).map(function (entry) {
+    var key = entry[0], m = entry[1];
+    var rate = m.requests > 0 ? m.successes / m.requests : 0;
+    return { key: key, requests: m.requests, successes: m.successes, costUsd: m.costUsd, rate: rate };
+  });
+
+  var threshold = stats.historicalScoringMinSamples;
+  var eligible = models.filter(function (m) { return m.requests >= threshold; });
+  var reviewWorthy = eligible.filter(function (m) { return m.rate < 0.7; })
+    .sort(function (a, b) { return a.rate - b.rate; });
+
+  var best = eligible.slice().sort(function (a, b) {
+    return b.rate - a.rate || b.requests - a.requests;
+  })[0];
+
+  content.innerHTML =
+    buildInsight(stats, models, eligible, reviewWorthy, best, threshold) +
+    buildKpiRow(stats) +
+    buildModelsSection(models, reviewWorthy, threshold);
+}
+
+function buildInsight(stats, models, eligible, reviewWorthy, best, threshold) {
+  var parts = [];
+  parts.push(stats.totalRequests + ' request' + (stats.totalRequests === 1 ? '' : 's') + ' logged, ' +
+    stats.successRate + '% succeeded, ' + formatCost(stats.totalCostUsd) + ' total spend.');
+
+  if (best) {
+    parts.push('<strong>' + escapeHtml(best.key) + '</strong> has the strongest track record so far, ' +
+      Math.round(best.rate * 100) + '% success over ' + best.requests + ' calls' +
+      (best.costUsd === 0 ? ', and it\'s free' : '') + '.');
+  }
+
+  if (reviewWorthy.length > 0) {
+    var worst = reviewWorthy[0];
+    parts.push('Worth checking <strong>' + escapeHtml(worst.key) + '</strong>, only ' +
+      Math.round(worst.rate * 100) + '% success over ' + worst.requests + ' calls, above the ' +
+      threshold + '-request bar where that number starts to mean something.');
+  } else if (eligible.length === 0 && models.length > 0) {
+    var need = threshold - Math.max.apply(null, models.map(function (m) { return m.requests; }));
+    parts.push('No model has crossed the ' + threshold + '-request threshold yet where success rate starts ' +
+      'influencing routing automatically, the busiest one needs ' + Math.max(need, 1) + ' more.');
+  }
+
+  return '<div class="insight">' + parts.join(' ') + '</div>';
+}
+
+function buildKpiRow(stats) {
+  var avgCost = stats.totalRequests > 0 ? stats.totalCostUsd / stats.totalRequests : 0;
+  return '<div class="kpi-row">' +
+    kpi(stats.totalRequests, 'Total requests', 'Since data/requests.jsonl started recording.') +
+    kpi(stats.successRate + '%', 'Success rate', successContext(stats.successRate)) +
+    kpi(formatCost(stats.totalCostUsd), 'Total cost', formatCost(avgCost) + ' average per request.') +
+    '</div>';
+}
+
+function successContext(rate) {
+  if (rate >= 95) return 'Comfortably healthy.';
+  if (rate >= 80) return 'Reasonable, but check the table below for which model is dragging it down.';
+  return 'Low enough to be worth investigating, see the table below.';
+}
+
+function kpi(value, label, context) {
+  return '<div class="kpi"><div class="value">' + value + '</div><div class="label">' + label +
+    '</div><div class="context">' + context + '</div></div>';
+}
+
+function buildModelsSection(models, reviewWorthy, threshold) {
+  var title, description, sorted;
+  if (reviewWorthy.length > 0) {
+    title = 'Models to review';
+    description = 'Sorted by success rate, worst first. Only models with ' + threshold +
+      '+ requests are judged here, below that a run of bad luck looks like a trend when it isn\'t.';
+    sorted = models.slice().sort(function (a, b) {
+      var aEligible = a.requests >= threshold, bEligible = b.requests >= threshold;
+      if (aEligible !== bEligible) return aEligible ? -1 : 1;
+      return a.rate - b.rate;
+    });
+  } else {
+    title = 'Models by usage';
+    description = 'Nothing has crossed the ' + threshold + '-request bar at a concerning success rate. Sorted by call volume.';
+    sorted = models.slice().sort(function (a, b) { return b.requests - a.requests; });
+  }
+
+  var rows = sorted.map(function (m) {
+    var eligible = m.requests >= threshold;
+    var statusHtml, note;
+    if (!eligible) {
+      statusHtml = '<span class="status-pending">Not yet</span>';
+      note = (threshold - m.requests) + ' more request' + (threshold - m.requests === 1 ? '' : 's') + ' needed';
+    } else if (m.rate < 0.7) {
+      statusHtml = '<span class="status-review">Active</span>';
+      note = 'Below 70% success, dragging its own routing score down';
+    } else {
+      statusHtml = '<span class="status-active">Active</span>';
+      note = '';
+    }
+    return '<tr>' +
+      '<td class="mono">' + escapeHtml(m.key) + '</td>' +
+      '<td class="num">' + m.requests + '</td>' +
+      '<td class="num">' + Math.round(m.rate * 100) + '%</td>' +
+      '<td class="num">' + formatCost(m.costUsd) + '</td>' +
+      '<td>' + statusHtml + '<div class="note">' + note + '</div></td>' +
+      '</tr>';
+  }).join('');
+
+  return '<section>' +
+    '<h2>' + title + '</h2>' +
+    '<p class="description">' + description + '</p>' +
+    '<table>' +
+    '<thead><tr><th>Model</th><th class="num">Requests</th><th class="num">Success</th>' +
+    '<th class="num">Cost</th><th>Adaptive routing</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody>' +
+    '</table>' +
+    '</section>';
+}
+
+function formatCost(value) {
+  if (value === 0) return '$0';
+  if (value < 0.01) return '$' + value.toFixed(4);
+  return '$' + value.toFixed(2);
+}
+
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
+}
+
+load();
+setInterval(load, 15000);
+</script>
+</body>
+</html>

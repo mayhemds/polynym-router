@@ -1,0 +1,37 @@
+{
+  "name": "polynym-router",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "Language-agnostic, provider-agnostic AI request router. Config-driven model registry so new models and providers are added without touching code.",
+  "author": "Tyrone",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR-USERNAME/polynym-router.git"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "mcp": "tsx src/mcp/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "start:mcp": "node dist/mcp/server.js",
+    "test": "tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.10",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}

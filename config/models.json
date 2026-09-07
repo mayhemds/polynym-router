@@ -1,0 +1,59 @@
+{
+  "claude_sonnet": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "apiKeyEnv": "ANTHROPIC_API_KEY",
+    "capabilities": ["coding", "reasoning", "architecture", "review", "agentic"],
+    "contextWindow": 1000000,
+    "tier": "frontier",
+    "pricePerMInputUsd": 3,
+    "pricePerMOutputUsd": 15,
+    "enabled": true
+  },
+  "claude_opus": {
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "apiKeyEnv": "ANTHROPIC_API_KEY",
+    "capabilities": ["coding", "reasoning", "architecture", "review", "agentic"],
+    "contextWindow": 1000000,
+    "tier": "frontier",
+    "pricePerMInputUsd": 15,
+    "pricePerMOutputUsd": 75,
+    "enabled": true
+  },
+  "gpt": {
+    "provider": "openai_compatible",
+    "model": "gpt-5",
+    "baseUrl": "https://api.openai.com/v1",
+    "apiKeyEnv": "OPENAI_API_KEY",
+    "capabilities": ["reasoning", "coding", "research", "agentic"],
+    "contextWindow": 400000,
+    "tier": "frontier",
+    "pricePerMInputUsd": 5,
+    "pricePerMOutputUsd": 15,
+    "enabled": true
+  },
+  "kimi_k2": {
+    "provider": "openai_compatible",
+    "model": "kimi-k2",
+    "baseUrl": "https://api.moonshot.ai/v1",
+    "apiKeyEnv": "KIMI_API_KEY",
+    "capabilities": ["coding", "implementation", "large_context", "reasoning"],
+    "contextWindow": 1000000,
+    "tier": "open",
+    "pricePerMInputUsd": 0.6,
+    "pricePerMOutputUsd": 2.5,
+    "enabled": true
+  },
+  "local_small": {
+    "provider": "ollama",
+    "model": "gemma4:latest",
+    "baseUrl": "http://localhost:11434",
+    "capabilities": ["classification", "low_cost", "extraction"],
+    "contextWindow": 128000,
+    "tier": "local",
+    "pricePerMInputUsd": 0,
+    "pricePerMOutputUsd": 0,
+    "enabled": true
+  }
+}
