@@ -128,7 +128,7 @@ If you use Claude Code or Cursor, you can skip the HTTP layer entirely and let y
 npx @modelcontextprotocol/inspector npm run mcp
 ```
 
-opens a local UI to test the connection first. Once that works, add the config shown in the README's "Phase 4" section to Claude Code or Cursor's MCP settings, and both `route_task` and `run_coding_task` become tools your editor can call on its own.
+opens a local UI to test the connection first. Once that works, add the config shown in the README's "MCP server" section to Claude Code or Cursor's MCP settings, and both `route_task` and `run_coding_task` become tools your editor can call on its own.
 
 ## What happens automatically over time
 

@@ -1,12 +1,10 @@
 # Polynym Router
 
-Built by Tyrone.
-
 A single HTTP endpoint your projects call instead of calling Claude, GPT, Kimi, or a local model directly. It reads a task description, works out what kind of work it is, and picks the best currently-configured model for the job. Your projects never hardcode a model name.
 
 **New here?** See `GETTING_STARTED.md` for a linear setup-to-first-use walkthrough. This document is the full reference.
 
-This covers all five planned phases: the core router, provider adapters, project context loading, task classification, role-based routing, request logging, git branch-per-task coding with test running and review, an MCP server, and adaptive routing from historical performance.
+It covers the core router, provider adapters, project context loading, task classification, role-based routing, request logging, git branch-per-task coding with test running and review, an MCP server, and adaptive routing from historical performance.
 
 ## Why this design
 
@@ -29,13 +27,13 @@ polynym-router/
 │   ├── types.ts
 │   ├── providers/         # one adapter per wire format, not per model
 │   ├── router/            # classifier, scorer, orchestrator for /v1/ai
-│   ├── agent/             # the Phase 3 coding agent orchestrator + file-block parser for /v1/tasks
+│   ├── agent/             # coding agent orchestrator + file-block parser for /v1/tasks
 │   ├── git/               # git CLI wrapper, branch-per-task safety model
 │   ├── testing/           # test command auto-detection + execution
 │   ├── projects/          # .ai/ context loader + project registry
 │   ├── telemetry/         # request log
 │   ├── routes/            # HTTP handlers
-│   └── mcp/               # Phase 4 MCP stdio server, wraps the same router/agent logic
+│   └── mcp/               # MCP stdio server, wraps the same router/agent logic
 ├── examples/sample-project/  # a Python project with a .ai/ folder, for testing
 ├── public/dashboard.html      # self-contained stats dashboard, no build step
 ├── GETTING_STARTED.md         # linear setup walkthrough, start here if you're new
@@ -142,15 +140,13 @@ export interface AIProvider {
 
 Drop the file in `src/providers/`, register it in `src/providers/index.ts` under a new key, then use that key as the `"provider"` value in `config/models.json`. The router, classifier, and scorer never change.
 
-## Phase 5: adaptive routing from history
+## Adaptive routing from history
 
-The scorer in `src/router/scorer.ts` now factors in each model's actual track record, not just declared capabilities and pricing.
+The scorer in `src/router/scorer.ts` factors in each model's actual track record, not just declared capabilities and pricing.
 
-**How it works**: every request is logged with a success/failure flag, same as always. Once a specific model key has **5 or more** logged requests, its success rate starts adjusting its score: a perfect record adds up to +15, a consistently poor one subtracts up to 15, scaled linearly around a 50% midpoint. Below 5 requests for that model, the adjustment is exactly zero, current behavior is unaffected.
+**How it works**: every request is logged with a success/failure flag. Once a specific model key has **5 or more** logged requests, its success rate starts adjusting its score: a perfect record adds up to +15, a consistently poor one subtracts up to 15, scaled linearly around a 50% midpoint. Below 5 requests for that model, the adjustment is exactly zero, current behavior is unaffected.
 
-This threshold is the whole point: it's why this could be built and shipped immediately instead of waiting, the logic is fully testable today with synthetic data (see `tests/scorer.test.ts`), and it stays inert on a fresh install where there's no real history yet to trust. It only starts influencing anything once you've actually used the router enough for a model to have a track record.
-
-This is intentionally simple for now, one success rate per model overall, not broken down per task type or role. A model could be excellent at `architecture` tasks and mediocre at `coding` ones and this wouldn't distinguish them yet. That's a reasonable future refinement once there's enough volume to make per-task-type breakdowns meaningful, not something worth adding before then.
+This is one success rate per model overall, not broken down per task type or role, so a model that's excellent at `architecture` tasks but mediocre at `coding` ones won't be distinguished yet.
 
 Check the dashboard (`/dashboard`) to see which models have crossed the 5-request threshold, that's the "Adaptive routing" column.
 
@@ -162,7 +158,7 @@ http://localhost:3000/dashboard
 
 A single self-contained HTML page (`public/dashboard.html`, no build step, no dependencies) showing total requests, success rate, total cost, and a per-model breakdown, refreshing every 15 seconds. It reads from the same `GET /v1/stats` endpoint everything else uses, this is just a friendlier view of the same data. All data stays local, the page only ever calls back to the router serving it.
 
-## Phase 3: the coding agent (`POST /v1/tasks`)
+## The coding agent (`POST /v1/tasks`)
 
 This is a different, higher-stakes endpoint from `/v1/ai`. Where `/v1/ai` just returns text, `/v1/tasks` actually branches, writes files, runs your tests, and commits, on your own filesystem. Read this section before pointing it at a real project.
 
@@ -237,7 +233,7 @@ curl -X POST http://localhost:3000/v1/tasks \
 - API keys are read from environment variables only, never written to `config/models.json` or logged.
 - `data/requests.jsonl` stores a truncated copy of each task description locally, for the telemetry described above. It's in `.gitignore`. If your tasks routinely contain sensitive material, keep that in mind before sharing the `data/` folder.
 
-## Phase 4: MCP server
+## MCP server
 
 This exposes the router directly to MCP-compatible tools, Claude Code, Cursor, or anything else that can spawn a local MCP server over stdio, without needing the HTTP server running separately. It imports `routeRequest` and `runCodingTask` directly, same logic as `/v1/ai` and `/v1/tasks`, just a different transport.
 
@@ -305,7 +301,7 @@ That opens a local UI where you can call `route_task`, `run_coding_task`, or `ge
 npm test
 ```
 
-Covers the classifier, the scorer including the Phase 5 historical-bonus threshold logic, the path-traversal guard on project context loading, and the file-block parser plus write-path safety guard used by `/v1/tasks`. It does not hit any real provider APIs and does not touch git or the filesystem outside `/tmp` paths used in assertions. The MCP server has no dedicated unit tests of its own, since it's a thin transport wrapper around already-tested logic, use the inspector command above to exercise it directly.
+Covers the classifier, the scorer including the historical-bonus threshold logic, the path-traversal guard on project context loading, and the file-block parser plus write-path safety guard used by `/v1/tasks`. It does not hit any real provider APIs and does not touch git or the filesystem outside `/tmp` paths used in assertions. The MCP server has no dedicated unit tests of its own, since it's a thin transport wrapper around already-tested logic, use the inspector command above to exercise it directly.
 
 ## License
 
