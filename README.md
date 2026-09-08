@@ -1,72 +1,18 @@
 # Polynym Router
 
-A single HTTP endpoint your projects call instead of calling Claude, GPT, Kimi, or a local model directly. It reads a task description, works out what kind of work it is, and picks the best currently-configured model for the job. Your projects never hardcode a model name.
+Polynym Router sits between your projects and the AI models you use. Instead of a project calling Claude, GPT, or Kimi directly, it sends the task to this router. The router looks at the task, works out what kind of work it is, and forwards it to whichever model is currently best suited for that job. Swap models or add a new provider by editing a config file, no code changes needed in the projects that use it.
 
-**New here?** See `GETTING_STARTED.md` for a linear setup-to-first-use walkthrough. This document is the full reference.
+**New here?** See [`GETTING_STARTED.md`](./GETTING_STARTED.md) for a step-by-step setup walkthrough. This document is the full reference.
 
-It covers the core router, provider adapters, project context loading, task classification, role-based routing, request logging, git branch-per-task coding with test running and review, an MCP server, and adaptive routing from historical performance.
+## What it does
 
-## Why this design
+- **Routes tasks to the right model.** Send it a plain-English task description and it classifies the work (coding, architecture, research, etc.), picks the best available model for that role, and returns the response. `POST /v1/ai`
+- **Writes and tests code on its own.** Point it at a git repo and it creates a branch, has a model write the code, runs your test suite, has a second model review the diff, and commits, all without touching your main branch or pushing anything. `POST /v1/tasks`
+- **Plugs into your editor via MCP.** Claude Code, Cursor, or any MCP-compatible tool can call the router directly as a set of tools, no HTTP server required.
+- **Learns from experience.** It tracks which models actually succeed or fail over time and quietly favors the ones with a good track record.
+- **Shows you what's happening.** A built-in dashboard shows request volume, cost, and success rate per model.
 
-**Any language, any project.** The router does not need to know what your project is written in. It reads a `.ai/` folder of plain markdown files sitting in the project's repo, `.ai/project.md`, `.ai/architecture.md`, and so on, whichever exist. Nothing about that format is TypeScript-specific. `examples/sample-project` is a Python/FastAPI project, deliberately not a TypeScript one, to prove the point. On top of that, the router does light auto-detection of the project's stack by checking for marker files (`go.mod`, `pyproject.toml`, `Cargo.toml`, `Gemfile`, and so on) purely for visibility in the response, it never gates on this.
-
-**Future-proof against model churn.** Nothing about which model fills which role is hardcoded in TypeScript. `config/models.json` is the entire model registry, edited as plain JSON. `config/roles.json` maps abstract roles (`implementer`, `architect`, `reviewer`, `researcher`, `cheap_worker`) to whichever model key currently fills them. When a new model comes out and changes the hierarchy, you edit two JSON files, you do not touch a single `.ts` file or redeploy your other projects. Adding a brand-new provider is usually also just a JSON entry: most providers, including Kimi/Moonshot, speak the same OpenAI-compatible chat completions format, so `config/models.json` just points at their base URL. A genuinely new wire format needs one new adapter file implementing a five-line interface, see "Adding a new provider" below.
-
-## Project layout
-
-```
-polynym-router/
-├── config/
-│   ├── models.json      # the model registry, edit this when models change
-│   ├── roles.json        # role -> model key
-│   ├── rules.json        # keyword -> task type / role, used by the classifier
-│   └── projects.json     # project name -> path, optional, you can also pass a full path per request
-├── src/
-│   ├── server.ts          # Express entry point (HTTP: /v1/ai, /v1/tasks, /v1/stats)
-│   ├── config.ts          # loads + validates the JSON config files
-│   ├── types.ts
-│   ├── providers/         # one adapter per wire format, not per model
-│   ├── router/            # classifier, scorer, orchestrator for /v1/ai
-│   ├── agent/             # coding agent orchestrator + file-block parser for /v1/tasks
-│   ├── git/               # git CLI wrapper, branch-per-task safety model
-│   ├── testing/           # test command auto-detection + execution
-│   ├── projects/          # .ai/ context loader + project registry
-│   ├── telemetry/         # request log
-│   ├── routes/            # HTTP handlers
-│   └── mcp/               # MCP stdio server, wraps the same router/agent logic
-├── examples/sample-project/  # a Python project with a .ai/ folder, for testing
-├── public/dashboard.html      # self-contained stats dashboard, no build step
-├── GETTING_STARTED.md         # linear setup walkthrough, start here if you're new
-└── tests/
-```
-
-## Setup
-
-Requires Node 18.17+ (works with Bun too if you prefer, the code has no Bun-specific APIs).
-
-```bash
-cd polynym-router
-npm install
-cp .env.example .env
-```
-
-Edit `.env` and fill in API keys only for the providers you actually use, matching the `apiKeyEnv` names referenced in `config/models.json`:
-
-```
-ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
-KIMI_API_KEY=...
-```
-
-If you plan to route anything to Ollama, make sure it's running locally (`ollama serve`) and the model is pulled (`ollama pull llama3.1:8b` or whatever you set in `config/models.json`).
-
-Run it:
-
-```bash
-npm run dev
-```
-
-## Using it
+## Quick example
 
 ```bash
 curl -X POST http://localhost:3000/v1/ai \
@@ -95,10 +41,36 @@ Response:
 }
 ```
 
-`project` looks the project up in `config/projects.json`. You can skip that file entirely and pass `projectPath` directly instead, an absolute or relative path to any project's root, which is what makes this usable across every project on your machine without maintaining a central list:
+`project` looks the project up in `config/projects.json`. You can skip that file entirely and pass `projectPath` instead, an absolute or relative path to any project's root:
 
 ```json
 { "task": "...", "projectPath": "/home/you/code/some-other-project" }
+```
+
+## Setup
+
+Requires Node 18.17+ (works with Bun too, the code has no Bun-specific APIs).
+
+```bash
+cd polynym-router
+npm install
+cp .env.example .env
+```
+
+Edit `.env` and fill in API keys only for the providers you actually use, matching the `apiKeyEnv` names referenced in `config/models.json`:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+KIMI_API_KEY=...
+```
+
+If you plan to route anything to Ollama, make sure it's running locally (`ollama serve`) and the model is pulled (`ollama pull llama3.1:8b` or whatever you set in `config/models.json`).
+
+Run it:
+
+```bash
+npm run dev
 ```
 
 For visibility into what's happened over time:
@@ -107,7 +79,13 @@ For visibility into what's happened over time:
 curl http://localhost:3000/v1/stats
 ```
 
-## Adding a new model
+## How model selection works
+
+**Any language, any project.** The router doesn't need to know what your project is written in. It reads an optional `.ai/` folder of plain markdown files in the project's repo (`.ai/project.md`, `.ai/architecture.md`, and so on, whichever exist) for context. `examples/sample-project` is a Python/FastAPI project, deliberately not TypeScript, to prove this works for any stack. It also does light auto-detection of the project's language by checking for marker files (`go.mod`, `pyproject.toml`, `Cargo.toml`, `Gemfile`, etc.), purely for visibility in the response, never as a gate.
+
+**Model choice lives in config, not code.** `config/models.json` is the entire model registry, plain JSON. `config/roles.json` maps abstract roles (`implementer`, `architect`, `reviewer`, `researcher`, `cheap_worker`) to whichever model key currently fills them. When a new model comes out, you edit two JSON files, you don't touch any TypeScript or redeploy the projects that call this router. Adding a new provider is usually also just a JSON entry, since most providers (including Kimi/Moonshot) speak the same OpenAI-compatible chat format. A genuinely different wire format needs one small adapter file, see "Adding a new provider" below.
+
+### Adding a new model
 
 Edit `config/models.json`, no code change:
 
@@ -128,7 +106,7 @@ Edit `config/models.json`, no code change:
 
 Add the matching `NEW_PROVIDER_API_KEY` to `.env`. Optionally point a role at it in `config/roles.json`. That's the whole change.
 
-## Adding a new provider (new wire format)
+### Adding a new provider (new wire format)
 
 Only needed if the provider doesn't speak the OpenAI chat completions format or Anthropic's format. Implement `AIProvider` from `src/types.ts`:
 
@@ -140,23 +118,13 @@ export interface AIProvider {
 
 Drop the file in `src/providers/`, register it in `src/providers/index.ts` under a new key, then use that key as the `"provider"` value in `config/models.json`. The router, classifier, and scorer never change.
 
-## Adaptive routing from history
+### Adaptive routing from history
 
-The scorer in `src/router/scorer.ts` factors in each model's actual track record, not just declared capabilities and pricing.
-
-**How it works**: every request is logged with a success/failure flag. Once a specific model key has **5 or more** logged requests, its success rate starts adjusting its score: a perfect record adds up to +15, a consistently poor one subtracts up to 15, scaled linearly around a 50% midpoint. Below 5 requests for that model, the adjustment is exactly zero, current behavior is unaffected.
+The scorer in `src/router/scorer.ts` factors in each model's actual track record, not just declared capabilities and pricing. Every request is logged with a success/failure flag. Once a specific model has **5 or more** logged requests, its success rate starts adjusting its score: a perfect record adds up to +15, a consistently poor one subtracts up to 15, scaled linearly around a 50% midpoint. Below 5 requests, the adjustment is zero.
 
 This is one success rate per model overall, not broken down per task type or role, so a model that's excellent at `architecture` tasks but mediocre at `coding` ones won't be distinguished yet.
 
 Check the dashboard (`/dashboard`) to see which models have crossed the 5-request threshold, that's the "Adaptive routing" column.
-
-## Dashboard
-
-```
-http://localhost:3000/dashboard
-```
-
-A single self-contained HTML page (`public/dashboard.html`, no build step, no dependencies) showing total requests, success rate, total cost, and a per-model breakdown, refreshing every 15 seconds. It reads from the same `GET /v1/stats` endpoint everything else uses, this is just a friendlier view of the same data. All data stays local, the page only ever calls back to the router serving it.
 
 ## The coding agent (`POST /v1/tasks`)
 
@@ -203,7 +171,7 @@ curl -X POST http://localhost:3000/v1/tasks \
 
 ### Overriding the test command per project
 
-`config/projects.json` entries can now be either a bare path (auto-detect the test command) or an object:
+`config/projects.json` entries can be either a bare path (auto-detect the test command) or an object:
 
 ```json
 {
@@ -225,17 +193,9 @@ curl -X POST http://localhost:3000/v1/tasks \
 - **Bounded attempts.** At most `maxImplementCycles` implement attempts and `maxReviewCycles` review rounds, it will not loop forever, it commits whatever it has and tells you honestly what state it's in.
 - **It executes your test command as a real shell command.** Only point this at projects whose test scripts you trust, the same way you'd trust running `npm test` yourself.
 
-
-## Security notes
-
-- This has no built-in authentication. It's meant to run on localhost or behind your own auth layer, don't expose it to the public internet as-is.
-- `projectPath` is checked against `ALLOWED_PROJECT_ROOTS` in `.env` before any file is read, to stop a request from pointing outside the directories you intend to expose. Defaults to the current working directory if unset.
-- API keys are read from environment variables only, never written to `config/models.json` or logged.
-- `data/requests.jsonl` stores a truncated copy of each task description locally, for the telemetry described above. It's in `.gitignore`. If your tasks routinely contain sensitive material, keep that in mind before sharing the `data/` folder.
-
 ## MCP server
 
-This exposes the router directly to MCP-compatible tools, Claude Code, Cursor, or anything else that can spawn a local MCP server over stdio, without needing the HTTP server running separately. It imports `routeRequest` and `runCodingTask` directly, same logic as `/v1/ai` and `/v1/tasks`, just a different transport.
+Lets MCP-compatible tools (Claude Code, Cursor, or anything else that can spawn a local MCP server over stdio) call the router directly, without needing the HTTP server running separately. It uses the exact same routing and coding-agent logic as `/v1/ai` and `/v1/tasks`, just a different transport.
 
 Three tools are exposed:
 
@@ -294,6 +254,49 @@ npx @modelcontextprotocol/inspector npm run mcp
 ```
 
 That opens a local UI where you can call `route_task`, `run_coding_task`, or `get_router_stats` directly and see the raw response, useful for confirming the server itself works before trusting an editor's integration of it.
+
+## Dashboard
+
+```
+http://localhost:3000/dashboard
+```
+
+A single self-contained HTML page (`public/dashboard.html`, no build step, no dependencies) showing total requests, success rate, total cost, and a per-model breakdown, refreshing every 15 seconds. It reads from the same `GET /v1/stats` endpoint everything else uses, this is just a friendlier view of the same data. All data stays local, the page only ever calls back to the router serving it.
+
+## Security notes
+
+- This has no built-in authentication. It's meant to run on localhost or behind your own auth layer, don't expose it to the public internet as-is.
+- `projectPath` is checked against `ALLOWED_PROJECT_ROOTS` in `.env` before any file is read, to stop a request from pointing outside the directories you intend to expose. Defaults to the current working directory if unset.
+- API keys are read from environment variables only, never written to `config/models.json` or logged.
+- `data/requests.jsonl` stores a truncated copy of each task description locally, for telemetry. It's in `.gitignore`. If your tasks routinely contain sensitive material, keep that in mind before sharing the `data/` folder.
+
+## Project layout
+
+```
+polynym-router/
+├── config/
+│   ├── models.json      # the model registry, edit this when models change
+│   ├── roles.json        # role -> model key
+│   ├── rules.json        # keyword -> task type / role, used by the classifier
+│   └── projects.json     # project name -> path, optional, you can also pass a full path per request
+├── src/
+│   ├── server.ts          # Express entry point (HTTP: /v1/ai, /v1/tasks, /v1/stats)
+│   ├── config.ts          # loads + validates the JSON config files
+│   ├── types.ts
+│   ├── providers/         # one adapter per wire format, not per model
+│   ├── router/            # classifier, scorer, orchestrator for /v1/ai
+│   ├── agent/             # coding agent orchestrator + file-block parser for /v1/tasks
+│   ├── git/               # git CLI wrapper, branch-per-task safety model
+│   ├── testing/           # test command auto-detection + execution
+│   ├── projects/          # .ai/ context loader + project registry
+│   ├── telemetry/         # request log
+│   ├── routes/            # HTTP handlers
+│   └── mcp/               # MCP stdio server, wraps the same router/agent logic
+├── examples/sample-project/  # a Python project with a .ai/ folder, for testing
+├── public/dashboard.html      # self-contained stats dashboard, no build step
+├── GETTING_STARTED.md         # linear setup walkthrough, start here if you're new
+└── tests/
+```
 
 ## Tests
 
