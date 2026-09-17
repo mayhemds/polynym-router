@@ -2,8 +2,14 @@ import { appendFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { MIN_HISTORICAL_SAMPLES } from "../router/scorer.js";
 
-const DATA_DIR = path.resolve(process.cwd(), "data");
-const LOG_FILE = path.join(DATA_DIR, "requests.jsonl");
+function dataDir(): string {
+  return process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(process.cwd(), "data");
+}
+
+function logFile(): string {
+  return path.join(dataDir(), "requests.jsonl");
+}
+
 const MAX_LOGGED_TASK_CHARS = 500;
 
 export interface RequestLogEntry {
@@ -26,7 +32,7 @@ let dirReady = false;
 
 async function ensureDataDir(): Promise<void> {
   if (dirReady) return;
-  await mkdir(DATA_DIR, { recursive: true });
+  await mkdir(dataDir(), { recursive: true });
   dirReady = true;
 }
 
@@ -45,7 +51,7 @@ export async function logRequest(entry: Omit<RequestLogEntry, "timestamp">): Pro
       timestamp: new Date().toISOString(),
       task: truncateForLog(entry.task),
     })}\n`;
-    await appendFile(LOG_FILE, line, "utf8");
+    await appendFile(logFile(), line, "utf8");
   } catch (error) {
     console.error("Failed to write telemetry log entry:", error instanceof Error ? error.message : error);
   }
@@ -61,7 +67,7 @@ export interface Stats {
 
 export async function readStats(): Promise<Stats> {
   try {
-    const raw = await readFile(LOG_FILE, "utf8");
+    const raw = await readFile(logFile(), "utf8");
     const lines = raw.split("\n").filter((line: string) => line.trim().length > 0);
     const entries: RequestLogEntry[] = lines.map((line: string) => JSON.parse(line) as RequestLogEntry);
 

@@ -42,7 +42,11 @@ export interface AppConfig {
   allowedRoots: string[];
 }
 
-const CONFIG_DIR = path.resolve(process.cwd(), "config");
+function configDir(): string {
+  return process.env.CONFIG_DIR
+    ? path.resolve(process.env.CONFIG_DIR)
+    : path.resolve(process.cwd(), "config");
+}
 
 let cachedConfig: AppConfig | undefined;
 
@@ -60,7 +64,7 @@ export function loadConfig(forceReload = false): AppConfig {
   const models = readJsonConfig("models.json", modelRegistrySchema);
   const roles = readJsonConfig("roles.json", roleMapSchema);
   const rules = readJsonConfig("rules.json", rulesSchema);
-  const projects = existsSync(path.join(CONFIG_DIR, "projects.json"))
+  const projects = existsSync(path.join(configDir(), "projects.json"))
     ? readJsonConfig("projects.json", projectsSchema)
     : {};
 
@@ -73,7 +77,7 @@ export function loadConfig(forceReload = false): AppConfig {
 }
 
 function readJsonConfig<T>(filename: string, schema: z.ZodType<T>): T {
-  const filePath = path.join(CONFIG_DIR, filename);
+  const filePath = path.join(configDir(), filename);
   if (!existsSync(filePath)) {
     throw new Error(`Missing required config file: config/${filename}`);
   }
