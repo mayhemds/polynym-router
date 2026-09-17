@@ -56,6 +56,11 @@ export async function checkoutBranch(cwd: string, branchName: string): Promise<v
   await git(cwd, ["checkout", branchName]);
 }
 
+/** Force-deletes a branch, used to clean up a task branch that was never committed to. */
+export async function deleteBranch(cwd: string, branchName: string): Promise<void> {
+  await git(cwd, ["branch", "-D", branchName]);
+}
+
 /** Diff of the current working tree against HEAD, i.e. everything not yet committed on this branch. */
 export async function getWorkingDiff(cwd: string): Promise<string> {
   return git(cwd, ["diff", "HEAD"]);

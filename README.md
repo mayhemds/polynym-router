@@ -65,7 +65,7 @@ OPENAI_API_KEY=sk-...
 KIMI_API_KEY=...
 ```
 
-If you plan to route anything to Ollama, make sure it's running locally (`ollama serve`) and the model is pulled (`ollama pull llama3.1:8b` or whatever you set in `config/models.json`).
+If you plan to route anything to Ollama, make sure it's running locally (`ollama serve`) and the model is pulled (`ollama pull gemma4:latest` or whatever you set in `config/models.json`).
 
 Run it:
 

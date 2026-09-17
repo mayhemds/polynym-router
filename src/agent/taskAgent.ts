@@ -14,6 +14,7 @@ import {
   getCurrentBranch,
   createTaskBranch,
   checkoutBranch,
+  deleteBranch,
   getWorkingDiff,
   commitAll,
   listTrackedFiles,
@@ -128,6 +129,7 @@ export async function runCodingTask(input: TaskAgentInput): Promise<TaskAgentRes
       );
     } catch (error) {
       await checkoutBranchSafely(projectRoot, baseBranch);
+      await deleteBranchSafely(projectRoot, branch);
       if (error instanceof TaskAgentError) {
         throw error;
       }
@@ -181,6 +183,7 @@ export async function runCodingTask(input: TaskAgentInput): Promise<TaskAgentRes
 
   if (filesChanged.length === 0) {
     await checkoutBranchSafely(projectRoot, baseBranch);
+    await deleteBranchSafely(projectRoot, branch);
     throw new TaskAgentError(
       "The implementer never produced an applicable file change after all attempts, no branch was left behind.",
       502
@@ -262,7 +265,7 @@ export async function runCodingTask(input: TaskAgentInput): Promise<TaskAgentRes
   const commitSha = await commitAll(projectRoot, commitMessage);
 
   const status = determineStatus(finalTestsPassed, reviewApproved);
-  const summary = buildSummary(status, branch, filesChanged, testCommand);
+  const summary = buildSummary(status, branch, filesChanged, testCommand, reviewApproved);
 
   await logRequest({
     project: input.project ?? null,
@@ -274,7 +277,7 @@ export async function runCodingTask(input: TaskAgentInput): Promise<TaskAgentRes
     provider: config.models[config.roles.implementer]?.provider ?? "unknown",
     costUsd: 0,
     latencyMs: 0,
-    success: true,
+    success: status === "committed_clean",
     attempts: implementAttempts,
   });
 
@@ -334,6 +337,14 @@ async function checkoutBranchSafely(cwd: string, branch: string): Promise<void> 
   }
 }
 
+async function deleteBranchSafely(cwd: string, branch: string): Promise<void> {
+  try {
+    await deleteBranch(cwd, branch);
+  } catch {
+    // Best effort, leaving a stray branch is preferable to masking the original error.
+  }
+}
+
 function buildImplementPrompt(task: string, projectContext: string | undefined, trackedFiles: string[], feedback: string | undefined): string {
   const parts: string[] = [
     "You are the implementer for a coding task. You must respond ONLY using this exact format for every file you add or change, nothing else outside the blocks matters:",
@@ -380,10 +391,23 @@ function determineStatus(testsPassed: boolean | null, reviewApproved: boolean | 
   return "committed_clean";
 }
 
-function buildSummary(status: TaskStatus, branch: string, filesChanged: string[], testCommand: string | undefined): string {
+function buildSummary(
+  status: TaskStatus,
+  branch: string,
+  filesChanged: string[],
+  testCommand: string | undefined,
+  reviewApproved: boolean | null
+): string {
   const fileNote = `${filesChanged.length} file(s) changed on branch "${branch}"`;
   if (status === "committed_clean") {
-    return `${fileNote}. Tests ${testCommand ? "passed" : "were not run, no test command found"} and the reviewer approved. Ready for you to inspect and merge.`;
+    const testNote = testCommand ? "passed" : "were not run, no test command found";
+    const reviewNote =
+      reviewApproved === true
+        ? "the reviewer approved"
+        : reviewApproved === false
+          ? "the reviewer requested changes"
+          : "the reviewer was skipped";
+    return `${fileNote}. Tests ${testNote} and ${reviewNote}. Ready for you to inspect and merge.`;
   }
   if (status === "committed_tests_failing") {
     return `${fileNote}. Tests are still failing after all implement attempts. Committed as-is for you to pick up manually, check the branch.`;

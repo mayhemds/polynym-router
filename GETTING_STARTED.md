@@ -31,10 +31,10 @@ You don't need to fill in any API keys yet, the first test below uses a free loc
 If you don't already have [Ollama](https://ollama.com) installed, install it, then pull a small model:
 
 ```bash
-ollama pull llama3.1:8b
+ollama pull gemma4:latest
 ```
 
-(Or use whatever model you already have, `ollama list` shows you. If it's a different one, edit `config/models.json` and change the `"model"` field under `"local_small"` to match.)
+(Or use whatever model you already have, `ollama list` shows you. If it's a different one, edit `config/models.json` and change the `"model"` field under `"local_small"` to match. That field is `gemma4:latest` by default, which is what this command pulls.)
 
 Start the router:
 
