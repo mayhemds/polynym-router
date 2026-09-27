@@ -21,6 +21,33 @@ const DASHBOARD_PATH = path.resolve(process.cwd(), "public", "dashboard.html");
  * dev tool. Swap for a shared store if this ever runs as more than one
  * process.
  */
+/**
+ * Optional bearer-token auth, enabled only when AUTH_TOKEN is set in .env.
+ * Protects the two endpoints that spend money or mutate the filesystem:
+ * POST /v1/ai and POST /v1/tasks. Read-only endpoints (/health, /dashboard,
+ * /v1/stats) stay open, they expose no secrets and cost nothing to hit.
+ * When AUTH_TOKEN is unset, behavior is exactly as before: no auth.
+ */
+function createAuthMiddleware() {
+  const expected = process.env.AUTH_TOKEN;
+  if (!expected || expected.trim().length === 0) {
+    return (_req: Request, _res: Response, next: NextFunction): void => next();
+  }
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const protectedPath = req.method === "POST" && (req.path === "/v1/ai" || req.path === "/v1/tasks");
+    if (!protectedPath) {
+      next();
+      return;
+    }
+    const header = req.header("authorization");
+    if (header !== `Bearer ${expected}`) {
+      res.status(401).json({ error: "Unauthorized: missing or invalid bearer token." });
+      return;
+    }
+    next();
+  };
+}
+
 function createRateLimiter(windowMs: number, maxRequests: number) {
   const hits = new Map<string, number[]>();
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -75,6 +102,8 @@ function main(): void {
       }
     });
   });
+
+  app.use(createAuthMiddleware());
 
   app.use(aiRouter);
   app.use(tasksRouter);

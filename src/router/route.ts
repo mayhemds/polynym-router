@@ -57,9 +57,10 @@ export async function routeRequest(input: RouteRequestInput): Promise<RouteResul
 
   const estimatedPromptTokens = estimateTokens(input.task + (context.text ?? ""));
 
-  // Phase 5: read once per request, cheap at current log sizes. Below
-  // MIN_HISTORICAL_SAMPLES for a given model this has zero effect on its
-  // score, see scorer.ts.
+  // Phase 5: read once per request, cached in telemetry so it no longer
+  // re-parses the whole log. Historical success is looked up per task type,
+  // so a model strong at "architecture" but weak at "coding" no longer gets
+  // a single blended score.
   const stats = await readStats();
 
   const candidates = Object.entries(config.models)
@@ -67,7 +68,14 @@ export async function routeRequest(input: RouteRequestInput): Promise<RouteResul
     .map(([key, model]) => ({
       key,
       model,
-      score: scoreModel(model, classification, config.roles, key, estimatedPromptTokens, stats.byModel[key]),
+      score: scoreModel(
+        model,
+        classification,
+        config.roles,
+        key,
+        estimatedPromptTokens,
+        stats.byModel[key]?.byTaskType[classification.taskType]
+      ),
     }))
     .sort((a, b) => b.score - a.score);
 
